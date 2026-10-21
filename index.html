@@ -10,9 +10,9 @@
 <title>LOS – Case Landing</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{background:#F0F3F9;font-family:'Inter',system-ui,sans-serif;color:#111;overflow-x:hidden}
-.screen{position:relative;width:100%;height:100vh;height:100dvh;min-height:700px;background:#F0F3F9;overflow:hidden}
+html,body{height:100%;margin:0;background:#000}
+body{background:#000;font-family:'Inter',system-ui,sans-serif;color:#111;overflow-x:hidden}
+.screen{position:relative;width:100%;max-width:600px;margin:0 auto;height:100vh;height:100dvh;min-height:700px;background:#F0F3F9;overflow:hidden}
 
 /* header */
 .header{position:absolute;top:0;left:0;right:0;height:245px;background:#F0F3F9;border-radius:0 0 24px 24px;text-align:center;z-index:3}
@@ -143,6 +143,21 @@ h1,.cloud{transition:top .35s ease}
 
 .assist .lang{position:absolute;top:8px;right:40px;height:24px;min-width:34px;padding:0 8px;border:1px solid #D5DAE6;border-radius:12px;background:#fff;font:600 11px 'Inter',sans-serif;color:#4B4BE6;cursor:pointer}
 .assist .q{margin-right:52px}
+
+/* black either side of the screen on wide windows */
+.edge{filter:brightness(0)}
+/* mic turns into send once something is typed */
+.mic-btn .send-ico{display:none}
+.mic-btn.send .mic{display:none}
+.mic-btn.send .send-ico{display:block}
+.mic-btn.send::before{opacity:1;transform:scale(1);background:#4B4BE6;inset:3px}
+
+/* full screen button (top right) */
+.fs-btn{position:absolute;right:12px;top:10px;width:40px;height:40px;border:0;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;-webkit-tap-highlight-color:transparent;z-index:4}
+.fs-btn:active{background:rgba(59,74,143,.08)}
+.fs-btn .ic-compress{display:none}
+.fs-btn.on .ic-compress{display:block}
+.fs-btn.on .ic-expand{display:none}
 </style>
 </head>
 <body>
@@ -152,6 +167,10 @@ h1,.cloud{transition:top .35s ease}
   <section class="header">
     <button class="home" aria-label="Home">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b4a8f" stroke-width="2" stroke-linejoin="round"><path d="M4 10.5 12 3l8 7.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>
+    </button>
+    <button class="fs-btn" id="fsBtn" aria-label="Full screen">
+      <svg class="ic-expand" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b4a8f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      <svg class="ic-compress" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b4a8f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
     </button>
 
     <div class="dial">
@@ -203,7 +222,7 @@ h1,.cloud{transition:top .35s ease}
   <section class="chat">
     <svg class="plus" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4A5163" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
     <input type="text" placeholder="Ask me about this case" aria-label="Ask me about this case">
-    <button class="mic-btn" id="micBtn" aria-label="Ask by voice"><svg class="mic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4A5163" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5"/></svg></button>
+    <button class="mic-btn" id="micBtn" aria-label="Ask by voice"><svg class="mic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4A5163" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5"/></svg><svg class="send-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg></button>
   </section>
   <div class="chips"><button>Application Summary</button><button>Bureau Report</button><button>Shop Analytics</button></div>
   </footer>
@@ -241,6 +260,45 @@ STEPS.forEach(([t,s,d,b],i)=>{
   cards.appendChild(c);
 });
 const barEls=[...bars.children], cardEls=[...cards.children];
+// ---- sound + haptics ----
+let AC=null, lastTick=0, hapticLabel=null;
+function ac(){
+  if(!AC){ const C=window.AudioContext||window.webkitAudioContext; if(!C) return null; AC=new C(); }
+  if(AC.state==='suspended') AC.resume();
+  return AC;
+}
+function tone(freq,t0,dur,vol,type,slideTo){
+  const c=ac(); if(!c) return;
+  const o=c.createOscillator(), g=c.createGain(), s=c.currentTime+t0;
+  o.type=type||'sine'; o.frequency.setValueAtTime(freq,s);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo,s+dur);
+  g.gain.setValueAtTime(0.0001,s); g.gain.exponentialRampToValueAtTime(vol,s+0.008); g.gain.exponentialRampToValueAtTime(0.0001,s+dur);
+  o.connect(g); g.connect(c.destination); o.start(s); o.stop(s+dur+0.03);
+}
+const SFX={
+  tap:()=>{tone(880,0,.09,.07,'sine',620);tone(1320,0,.05,.025,'triangle');},
+  tick:()=>{const n=performance.now(); if(n-lastTick<45) return; lastTick=n; tone(1500,0,.035,.035,'triangle',1100);},
+  send:()=>{tone(660,0,.10,.07);tone(990,.07,.14,.07);},
+  mic:()=>{tone(520,0,.10,.07,'sine',700);tone(780,.08,.12,.06);}
+};
+function sfx(n){ try{ SFX[n]&&SFX[n](); }catch(_){} }
+function haptic(ms){
+  if(navigator.vibrate){ try{ navigator.vibrate(ms||10); }catch(_){} return; }
+  try{ // iOS Safari: toggling a switch checkbox gives a light tap
+    if(!hapticLabel){
+      hapticLabel=document.createElement('label'); hapticLabel.style.cssText='position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none';
+      const i=document.createElement('input'); i.type='checkbox'; i.setAttribute('switch',''); hapticLabel.appendChild(i); document.body.appendChild(hapticLabel);
+    }
+    hapticLabel.click();
+  }catch(_){}
+}
+// soft sound + tiny buzz on every button tap
+document.addEventListener('pointerdown',e=>{
+  const b=e.target.closest&&e.target.closest('button');
+  if(!b||b.id==='micBtn'||b.disabled) return;
+  sfx('tap'); haptic(6);
+},true);
+
 // ---- list (expanded) view ----
 const screenEl=document.getElementById('screen'), list=document.getElementById('list'), toggleBtn=document.getElementById('toggle');
 STEPS.forEach((s,k)=>{
@@ -272,6 +330,7 @@ cards.addEventListener('scroll',()=>{
   if(programmatic) return;
   const pitch=cardEls[1].offsetLeft-cardEls[0].offsetLeft;
   const i=Math.max(0,Math.min(STEPS.length-1,Math.round(cards.scrollLeft/pitch)));
+  if(i!==active){ haptic(8); sfx('tick'); }
   paint(i);
 },{passive:true});
 // mouse drag for desktop
@@ -305,7 +364,7 @@ function showBubble(i){
 }
 function pick(x,smooth){
   const i=nearestBar(x);
-  if(i!==active){ goTo(i,smooth); if(navigator.vibrate) navigator.vibrate(8); }
+  if(i!==active){ goTo(i,smooth); haptic(8); sfx('tick'); }
   showBubble(i);
 }
 stepper.addEventListener('pointerdown',e=>{
@@ -611,7 +670,7 @@ function startVoice(){
   stopSpeaking();
   rec=new SR(); rec.lang=OUT==='hi'?'hi-IN':'en-IN'; rec.interimResults=true; rec.continuous=false; rec.maxAlternatives=1;
   let finalText='';
-  rec.onstart=()=>{listening=true;micBtn.classList.add('listening');micBtn.setAttribute('aria-label','Stop listening');askInput.value='';askInput.placeholder=t('Listening…','सुन रही हूँ…');assist.classList.remove('show');};
+  rec.onstart=()=>{listening=true;micBtn.classList.add('listening');micBtn.setAttribute('aria-label','Stop listening');askInput.value='';syncMic();askInput.placeholder=t('Listening…','सुन रही हूँ…');assist.classList.remove('show');};
   rec.onresult=e=>{let x='';for(let i=e.resultIndex;i<e.results.length;i++){x+=e.results[i][0].transcript;if(e.results[i].isFinal)finalText+=e.results[i][0].transcript;}askInput.value=finalText||x;};
   rec.onerror=e=>{
     if(e.error==='not-allowed'||e.error==='service-not-allowed') showAssist({a:t('Microphone access is blocked for this page. Allow the microphone in your browser, or type your request instead.','इस पेज के लिए माइक्रोफ़ोन की अनुमति बंद है। ब्राउज़र में माइक्रोफ़ोन की अनुमति दें, या अपनी बात टाइप करें।')});
@@ -620,21 +679,51 @@ function startVoice(){
   };
   rec.onend=()=>{
     listening=false;micBtn.classList.remove('listening');micBtn.setAttribute('aria-label','Ask by voice');askInput.placeholder='Ask me about this case';
-    const x=(finalText||askInput.value).trim(); askInput.value='';
+    const x=(finalText||askInput.value).trim(); askInput.value=''; syncMic();
     if(x) run(x,true);
   };
   try{rec.start();}catch(_){}
 }
-micBtn.addEventListener('click',()=>{ if(listening&&rec){rec.stop();} else startVoice(); });
-askInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){const x=askInput.value;askInput.value='';askInput.blur();run(x,false);} });
+function syncMic(){
+  const has=!listening&&askInput.value.trim().length>0;
+  micBtn.classList.toggle('send',has);
+  micBtn.setAttribute('aria-label',listening?'Stop listening':has?'Send':'Ask by voice');
+}
+function submitTyped(){
+  const x=askInput.value.trim(); if(!x) return;
+  askInput.value=''; syncMic(); askInput.blur(); run(x,false);
+}
+askInput.addEventListener('input',syncMic);
+micBtn.addEventListener('click',()=>{
+  if(listening&&rec){ sfx('tap'); rec.stop(); }
+  else if(askInput.value.trim()){ sfx('send'); haptic(10); submitTyped(); }
+  else { sfx('mic'); haptic(10); startVoice(); }
+});
+askInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submitTyped(); } });
 document.querySelectorAll('.chips button').forEach(b=>b.addEventListener('click',()=>run(b.textContent,false)));
 
-// ---- open full screen on the first tap, where the browser allows it ----
-document.addEventListener('pointerup',function(){
+// ---- full screen ----
+const fsBtn=document.getElementById('fsBtn');
+const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
+function noFs(){ showAssist({a:t("Full screen isn't available here. On iPhone, tap Share → Add to Home Screen to open without the browser bar.",'यहाँ फ़ुल स्क्रीन उपलब्ध नहीं है। iPhone पर शेयर → "होम स्क्रीन में जोड़ें" से बिना ब्राउज़र बार के खोलें।'),autoHide:6000}); }
+function fsToggle(){
+  const el=document.documentElement;
+  if(fsEl()){ try{ (document.exitFullscreen||document.webkitExitFullscreen).call(document); }catch(_){} return; }
+  const req=el.requestFullscreen||el.webkitRequestFullscreen;
+  if(!req){ noFs(); return; }
+  try{ const p=req.call(el,{navigationUI:'hide'}); if(p&&p.catch) p.catch(noFs); }catch(_){ noFs(); }
+}
+function fsSync(){ const on=!!fsEl(); fsBtn.classList.toggle('on',on); fsBtn.setAttribute('aria-label',on?'Exit full screen':'Full screen'); }
+['fullscreenchange','webkitfullscreenchange'].forEach(ev=>document.addEventListener(ev,fsSync));
+fsBtn.addEventListener('click',fsToggle);
+// open full screen on the first tap elsewhere, where the browser allows it
+document.addEventListener('pointerup',function autoFs(e){
+  if(e.target.closest&&e.target.closest('.fs-btn')) return;
+  document.removeEventListener('pointerup',autoFs);
   const el=document.documentElement, req=el.requestFullscreen||el.webkitRequestFullscreen;
-  if(!req||document.fullscreenElement) return;
+  if(!req||fsEl()) return;
   try{ const p=req.call(el,{navigationUI:'hide'}); if(p&&p.catch) p.catch(()=>{}); }catch(_){}
-},{once:true});
+});
 </script>
 </body>
 </html>
