@@ -5,6 +5,8 @@
 <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F0F3F9">
 <meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%20%22Lentra%20LOS%22%2C%20%22short_name%22%3A%20%22LOS%22%2C%20%22start_url%22%3A%20%22./%22%2C%20%22scope%22%3A%20%22./%22%2C%20%22display%22%3A%20%22fullscreen%22%2C%20%22orientation%22%3A%20%22portrait%22%2C%20%22background_color%22%3A%20%22%23000000%22%2C%20%22theme_color%22%3A%20%22%23F0F3F9%22%7D">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>LOS – Case Landing</title>
@@ -762,6 +764,11 @@ h1,.cloud{transition:top .35s ease}
 .card .cpanel{border-radius:16px}
 .card button{border-radius:12px}
 @supports (corner-shape:squircle){.card{corner-shape:squircle;border-radius:34px}.card .cpanel{corner-shape:squircle;border-radius:26px}.card button{corner-shape:squircle;border-radius:18px}}
+
+/* no sideways scroll on mobile: off-screen views (translated) must not extend the page */
+html,body{overflow:hidden;overflow:clip;width:100%;max-width:100%;overscroll-behavior:none}
+html{position:relative}
+body{position:fixed;inset:0;height:auto}
 </style>
 </head>
 <body>
@@ -1512,7 +1519,11 @@ document.querySelectorAll('.chips button:not(.tl-chip)').forEach(b=>b.addEventLi
 // ---- full screen ----
 const fsBtns=[...document.querySelectorAll('.fs-btn')];
 const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
-function noFs(){ showAssist({a:t("Full screen isn't available here. On iPhone, tap Share → Add to Home Screen to open without the browser bar.",'यहाँ फ़ुल स्क्रीन उपलब्ध नहीं है। iPhone पर शेयर → "होम स्क्रीन में जोड़ें" से बिना ब्राउज़र बार के खोलें।'),autoHide:6000}); }
+function noFs(){
+  const en="Full screen isn't supported by this browser. On iPhone: Share → Add to Home Screen. On Android: menu → Add to Home screen / Install app.";
+  if(!dash.classList.contains('off')){ toast(en); return; }
+  showAssist({a:t(en,'यह ब्राउज़र फ़ुल स्क्रीन सपोर्ट नहीं करता। iPhone पर शेयर → "होम स्क्रीन में जोड़ें" का उपयोग करें।'),autoHide:6000});
+}
 function fsToggle(){
   const el=document.documentElement;
   if(fsEl()){ try{ (document.exitFullscreen||document.webkitExitFullscreen).call(document); }catch(_){} return; }
